@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dar Zitoune — Démo restaurant</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f0e7;color:#203c32;font:16px/1.5 system-ui,sans-serif}main{max-width:1020px;margin:auto;padding:32px 20px}header{background:#20463a;color:#fff3d9;padding:32px;border-radius:24px;margin-bottom:20px}header p{margin:0}h1{font:clamp(40px,8vw,76px)/1 Georgia,serif;margin:10px 0}h2{font:28px Georgia,serif;margin:0 0 14px}.layout{display:grid;grid-template-columns:1fr 1.7fr;gap:16px}section,aside{background:#fffaf1;padding:22px;border:1px solid #ded4c5;border-radius:18px}.line{display:flex;justify-content:space-between;border-bottom:1px solid #e6dccf;padding:8px 0;gap:10px}button,input,select{font:inherit;border-radius:10px;border:1px solid #b9b1a1;padding:9px 12px;background:white;color:inherit}button{cursor:pointer}.send{background:#20463a;color:white}form,.examples{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}input{flex:1;min-width:150px}.log{min-height:185px;max-height:380px;overflow:auto;margin-top:12px}.log p{padding:9px 12px;border-radius:10px;background:#e8eee2;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}.log .visitor{background:#f1e5d4;margin-left:25px}small{display:block;margin-top:10px}@media(max-width:680px){.layout{grid-template-columns:1fr}}
+</style>
+<main>
+<header><p>CASABLANCA · RESTAURANT FICTIF</p><h1>Dar Zitoune</h1><p>Menu, horaires et questions clients</p><p style="margin-top:14px">SV · Khalid Aslaoui (SOOVENSO)</p></header>
+<div class="layout">
+<aside><h2>Carte de la démo</h2><div id="menu"></div><p id="hours"></p></aside>
+<section><h2>Assistant du restaurant</h2>
+<label for="locale">Langue de réponse</label>
+<select id="locale"><option value="fr">Français</option><option value="ma">الدارجة</option></select>
+<div class="examples"><button type="button" data-question="menu">Menu</button><button type="button" data-question="hours">Horaires</button><button type="button" data-question="allergy">Allergies</button></div>
+<div class="log" id="log" role="log" aria-label="Conversation"></div>
+<form id="chat"><input id="question" aria-label="Votre question" required maxlength="280" placeholder="Écrivez votre question…" dir="auto"><button class="send">Envoyer</button></form>
+<small>Démo locale à règles. Les demandes de transfert apparaissent ci-dessous.</small>
+</section>
+</div>
+<section style="margin-top:16px"><h2>À reprendre par un employé <span id="count">(0)</span></h2><ol id="inbox"></ol><small>File de démo. Elle se vide au rechargement.</small></section>
+</main>
+<script>
+const menu = [
+  { fr: 'Tajine de poulet', ma: 'طاجين الدجاج', price: 69, match: /tajine.*(?:poulet|djaj)|طاجين.*الدجاج/ },
+  { fr: 'Couscous aux légumes', ma: 'كسكس بالخضر', price: 55, match: /couscous|kseksou|ksksou|كسكس/ },
+  { fr: 'Thé à la menthe', ma: 'أتاي بالنعناع', price: 15, match: /menthe|atay|اتاي|أتاي|نعناع/ }
+];
+const hours = { fr: 'Du mardi au dimanche, de 12 h à 22 h. Fermé le lundi.', ma: 'كنحلو من التلات حتى لحد، من 12 دالنهار حتى لـ10 دالليل. مسدودين نهار التنين.' };
+const prompts = {
+  fr: {menu: 'Quel est le menu ?', hours: 'Quels sont les horaires ?', allergy: 'Ce plat contient-il des noix ?'},
+  ma: {menu: 'شنو كاين فالمينيو؟', hours: 'فاش كتحلو؟', allergy: 'واش هاد الطبق فيه المكسرات؟'}
+};
+const menuText = locale => menu.map(item => item[locale] + ' — ' + item.price + ' DH').join('\n');
+
+function answer(question, locale) {
+  const text = question.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+  const handoff = {
+    human: true,
+    text: locale === 'ma' ? 'زدت السؤال فلائحة ديال الموظف باش يجاوبك.' : 'J’ai ajouté votre question à la file de reprise de la démo.'
+  };
+  if (/allerg|noix|arachid|gluten|lactose|reservation|reserver|حساسي|مكسرات|كاوكاو|حجز|7جز/.test(text)) return handoff;
+  const items = menu.filter(item => item.match.test(text));
+  const asksPrice = /prix|combien|ch7al|bch7al|ثمن|شحال/.test(text);
+  const asksHours = /horaire|ouvert|ferme|wa9t|kat7l|kat7ell|السوايع|كتحلو|محلول|كتسدو/.test(text);
+  const asksMenu = /\bmenu\b|carte|مينيو|القايمة/.test(text);
+  const replies = [];
+  if (asksHours) replies.push(hours[locale]);
+  if (asksMenu) replies.push(menuText(locale));
+  else if (items.length && asksPrice) replies.push(items.map(item => item[locale] + ' — ' + item.price + ' DH').join('\n'));
+  if (asksPrice && !items.length && !asksMenu) return handoff;
+  return replies.length ? {human: false, text: replies.join('\n\n')} : handoff;
+}
+
+const byId = id => document.getElementById(id);
+const locale = byId('locale');
+const log = byId('log');
+for (const line of menuText('fr').split('\n')) {
+  const item = document.createElement('div');
+  item.className = 'line';
+  item.textContent = line;
+  byId('menu').append(item);
+}
+byId('hours').textContent = hours.fr;
+
+function post(message, role) {
+  const entry = document.createElement('p');
+  entry.dir = 'auto';
+  entry.className = role;
+  entry.textContent = message;
+  log.append(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+function ask(message) {
+  const result = answer(message, locale.value);
+  post(message, 'visitor');
+  post(result.text, 'assistant');
+  if (result.human) {
+    const item = document.createElement('li');
+    item.dir = 'auto';
+    item.textContent = message;
+    byId('inbox').append(item);
+    byId('count').textContent = '(' + byId('inbox').children.length + ')';
+  }
+}
+
+byId('chat').addEventListener('submit', event => {
+  event.preventDefault();
+  const input = byId('question');
+  if (!input.value.trim()) return;
+  ask(input.value.trim());
+  input.value = '';
+});
+for (const button of document.querySelectorAll('[data-question]')) {
+  button.addEventListener('click', () => ask(prompts[locale.value][button.dataset.question]));
+}
+</script>
+</html>
